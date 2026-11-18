@@ -1,0 +1,245 @@
+# Verify a refactor
+
+Verify the exact candidate, against a named baseline and the task's acceptance
+conditions. Read the operating contract and [check record](../references/records.md#check).
+Use existing project tooling when it establishes the required property. Scale
+checks to the transformation; do not invent an expensive independent checking
+infrastructure for a local rename, or call a rename sufficient evidence for a
+changed mathematical definition.
+
+## Establish the check environment
+
+Record the revision/patch, relevant uncommitted changes, `lean-toolchain`, pinned
+dependency manifest, Lake configuration, and relevant options. Keep them fixed
+except for planned configuration changes needed by the migration; keep toolchain
+and dependency versions fixed through ordinary cleanup. Run the documented
+build/check commands from the target root and record their real results. Inspect
+build configuration when necessary: a successful default target need not compile
+every library, example, benchmark, executable, or challenge file.
+
+For repository verification or changes to toolchain/dependency pins, assess
+[build health](../rubrics/build-health.md), including the dated release comparison.
+A bounded source repair may reuse applicable audit evidence; label wider health
+coverage that remains unreviewed. Upgrade findings do not authorize changing pins.
+
+Use the project's normal execution environment and host protections. Lean
+elaboration and build scripts can execute code; ordinary compilation does not
+provide the isolation or independent trust guarantees of a separately configured
+proof comparator. Do not describe a trusted local development check as an audit
+of arbitrary adversarial compiler extensions.
+
+For orientation, a Lake project commonly supports:
+
+```sh
+lake env lean --version
+lake build
+lake env lean path/to/ConsumerProbe.lean
+```
+
+These are examples, not a universal check list. Discover actual targets and
+supported options in the pinned toolchain; do not guess a linter, import-analysis,
+comparator, or timing command and report it as run. A `lake env lean` probe may
+need imported project modules built first. Keep probes in the run directory or
+a designated test location and record how the module search path is configured.
+
+## Preserve the specification
+
+Before editing important signatures or definitions, retain the original
+specification and its relevant definition dependencies in a baseline snapshot
+outside the candidate's write boundary. Reuse trusted project challenge files
+when available, identifying their revision and ownership. Preserve the meanings
+of the objects in a claim, not only a pretty-printed type mentioning their names.
+
+Choose evidence appropriate to the change:
+
+| Transformation | Required preservation evidence |
+| --- | --- |
+| Proof body only | The same elaborated statement and unchanged referenced definition meanings, with the replacement proof checked and its axioms inspected as appropriate |
+| Move or rename | Old-to-new mapping, corresponding statements/definitions, migrated consumers, and relevant namespace/attribute behavior |
+| Module split or merge | Mapped declarations with preserved elaborated types, binders, universes, and definition meanings; intended local-context, visibility, computation, and consumer behavior, using the [structural migration checks](structure.md#accept-the-batch-before-expanding) |
+| Generalized theorem | A checked derivation of the original quantified claim through the new theorem, with no added assumptions |
+| Removed Mathlib-covered declaration | A checked recovery of the original quantified claim from the located replacement, preserved definition meanings, migrated consumers/automation, and a documented old-to-new use mapping; retaining the old declaration name is not required |
+| Replaced definition or representation | A checked equality, equivalence, isomorphism, or other mathematically appropriate relation to the preserved object, plus transport of the claimed properties and consumer behavior that matters |
+| Restructured main theorem API | Checked recovery of every affected original main claim through the new API, retaining its intended objects and permitted assumptions |
+
+Use identical-type comparison for unchanged contracts and checked recovery for
+authorized generalizations. A comparison tool's inability to accept a stronger
+replacement does not by itself make that replacement mathematically invalid.
+
+A copied theorem statement importing changed candidate definitions is not an
+independent reference. A theorem `newResult : NewProperty` does not preserve the
+old result merely because the text once also read `NewProperty`. Likewise,
+proving an equivalence after redefining both sides proves nothing about the
+original meaning. A bridge must refer to genuinely preserved definitions or an
+independently trusted specification. Preserve required computation/reduction
+behavior when consumers use definitions computationally; logical equivalence of
+predicates alone does not preserve such behavior.
+
+Use a compatible statement-comparison tool when the project has one, especially
+for major result boundaries. Keep its trusted challenge and configuration
+separate from editable solution code; record the compared declarations, allowed
+axioms, checker version, and actual guarantees. Check the pinned tool's
+documentation: Comparator functionality moved into Lean/Lake starting with
+v4.35.0; older projects may use the standalone project. Do not upgrade the target
+just to obtain a checker. See the [upstream Comparator documentation](https://github.com/leanprover/comparator)
+for the transition and trust assumptions. A checker that deliberately leaves
+some definitions open cannot establish their intended mathematical meaning.
+
+If no compatible tool is available, use explicit preservation proofs and
+source/definition review appropriate to the task, and state the limits. A
+non-definitional representation change may require transport proofs instead of
+an equality comparator. If necessary preservation evidence cannot be produced,
+leave that task unaccepted; do not weaken its requirement to "it builds".
+
+## Check proofs and trusted assumptions
+
+Compare new and baseline holes and assumptions. A text search for `sorry`,
+`admit`, or `axiom` is useful triage, not a transitive axiom audit: it can match
+comments, miss elaborator-generated holes, and miss assumptions in imports.
+
+Use project axiom checks or Lean's `#print axioms` for affected results, relevant
+new public declarations, and the main claims whose proof paths changed. For
+example, in a probe importing an actually existing candidate module:
+
+```lean
+-- Replace these identifiers with located target declarations.
+import Project.Main
+#print axioms Project.mainResult
+```
+
+Record the returned constants and compare them with the effective project
+policy and baseline. `sorryAx` indicates a proof hole. Custom axioms can enter
+transitively even when changed source contains no `axiom` declaration. Do not
+silently assume that every project permits the same axioms; many classical Lean
+projects permit `propext`, `Classical.choice`, and `Quot.sound`, but the project's
+stated policy governs. If none is documented, report the baseline and require no
+new trusted assumptions; leave any broader trust certification unresolved.
+
+Check newly exposed public results as well as final roots: an unused hole in a
+new reusable lemma may not occur in a main theorem's axiom list. Record existing
+incomplete areas separately. A build that emits a sorry warning is still not a
+hole-free verification. Do not disable linters or exclude failing files to make
+the evidence appear green.
+
+## Check migration and integration
+
+Build the changed modules, affected consumers, and required final targets.
+For structural migrations, build every destination module explicitly or establish
+its coverage through the actual roots/globs and migrated import closure. A file's
+presence under a library directory alone does not establish that it was built.
+Include examples and other targets outside the default build when affected.
+Run relevant configured linters and import checks; do not repeat an unchanged
+check solely to produce more logs.
+
+Apply the [build-health warning requirement](../rubrics/build-health.md#require-warning-free-builds-within-scope)
+to these targets. Record baseline and new diagnostics, any justified policy
+exceptions, and whether the checked scope is warning-free. A successful build
+with unresolved warnings does not pass that requirement merely because it adds
+no warnings; unrelated warnings outside a bounded repair remain open findings.
+
+Inspect old-to-new names and paths in sources, imports, umbrella files, docs,
+examples, tests, build targets, attributes, generated names, and auxiliary tools.
+Check intended retained aliases separately from accidental duplicates. A
+consumer probe should import the proposed public module, not an umbrella module
+that silently restores removed dependencies. Exercise applicable rewrite,
+extensionality, typeclass, coercion, and notation behavior without unfolding
+internal implementation merely to make the probe succeed.
+
+For merged work, rerun affected checks against the combined candidate. A
+successful worker build is evidence about that worker's snapshot. Run the final
+repository checks required by the plan; if a full build is unaffordable or
+unavailable, report the exact unchecked boundary. Routine use of valid pinned
+build caches is fine. Force a fresh or targeted rebuild when stale artifacts,
+removed modules, or changed build configuration could mask missing coverage.
+
+## Verify the claimed improvement
+
+Apply [duplication repair checks](inclusive-duplication.md#choose-and-verify-the-repair)
+to reuse changes. Verify proof delegation, justified retention, or deletion and
+recovery independently of judge output. A retained useful wrapper can remain a
+known overlap after its proof is shortened. When numerical evaluation was
+requested, use [comparable actual judge runs](inclusive-duplication.md#measure-duplication-when-requested)
+and report unavailable or unmet measurements separately from repair verification.
+
+Revisit the relevant rubrics and the concrete acceptance condition:
+
+- Does an actual consumer use the extracted API without importing the original
+  application machinery? Label synthetic probes as probes, not discovered users.
+- Did the located existing result replace duplicated implementation while useful
+  public behavior remained available?
+- Are definition-containing modules and their transitive imports smaller for
+  the same main statements? Distinguish definitions used by the statement from
+  proof dependencies and unrelated library files.
+- Can a weaker-assumption statement serve the identified consumer, with the old
+  result still derivable?
+- Are names, docs, and source mappings accurate after moves?
+
+After an extraction or newly exposed API, revisit the original sites and the
+identified migration boundary for remaining independent copies. Retained adapters
+need a role; multiple implementations need their own justification. Review the new
+public signatures for unnecessary assumptions and dependency-level reuse too.
+Availability of a helper is not evidence that its consumers have been migrated.
+
+If measuring dependencies, state whether the graph is file imports or actual
+constant dependencies, and whether dependency packages are included. If measuring
+performance, compare the same targets, toolchain, hardware/resources, and cache
+conditions; label cold, warm, and incremental runs. File count and line count
+are context, not standalone quality goals. No speed claim follows from a
+smaller-looking import list alone.
+
+## Reconcile theorem coverage
+
+Before the final report, apply the declared
+[theorem review scope](audit.md#theorem-coverage). Re-enumerate the final
+project-owned theorem/lemma inventory with the same inclusion rules and reconcile
+it against [individual review records](../references/records.md#theorem-review).
+For an explicitly sampled review, reconcile the selected cohort and report its
+size separately from the wider scope where known; unselected material prevents
+a full-scope claim but does not prevent completing the requested sample.
+For the declared review set, check:
+
+- Every final declaration has an ID and current, separately evidenced assumption
+  and reuse outcomes. Include new helpers and relevant unchanged declarations.
+- Every baseline ID still exists or has an explained move, rename, replacement,
+  removal, split, or merge mapping. Dropping a theorem from the census is not a
+  completed review or an assumption removal.
+- Evidence remains valid for the final definitions, instances, dependencies,
+  consumers, and replacement search context. Refresh affected outcomes; reuse
+  unaffected ones rather than restarting the whole audit after each edit.
+- Reconciliation reports missing, stale, duplicated, and unmapped records, the
+  enumeration/check method, and any census uncertainty. Do not assume a bundled
+  checker exists or certify completeness from a regex-only name list.
+
+Report a numerator and denominator for each check over the final inventory,
+plus theorems with both checks current. Separate baseline mappings and added
+theorems so inventory growth cannot masquerade as improved coverage. Missing or
+stale outcomes, or an incomplete census, prevent a full-coverage claim. A reviewed
+candidate can remain unresolved: examined coverage does not mean no defects or
+an accepted repair. A resource limit produces an honest partial handoff, not a
+silently smaller scope.
+
+Reconcile the [verified improvement records](../references/records.md#verified-improvement)
+against the final patch, linked preservation/consumer checks, and baseline-to-final
+mappings. Exclude reverted, unintegrated, or unchecked edits from verified totals;
+deduplicate repeated work and keep whole assumption removals separate from
+weakening. Check Mathlib replacement counts against located results and retained
+adapters, with local replacements reported separately. Recompute the final
+[measurements](../references/records.md#measurements) over the declared source set
+and check that displayed totals and deltas follow the recorded counting rules.
+Missing measurements are unavailable with a reason, not zero.
+
+## Accept or return
+
+Accept a task only when its required build, preservation, trust, migration, and
+quality evidence is satisfied. Return a defect to repair; mark missing checks
+`unavailable` or `not_run`, with task acceptance pending. Do not describe a
+partially verified candidate as a completed verified cleanup.
+
+Deliver the candidate identity, passed/failed/unperformed checks with scope,
+preserved claims, observed quality changes, migration notes, remaining findings,
+and limits. Distinguish a completed review that found problems from a patch that
+passed all required checks. Independent kernel/statement checks and mathematical
+faithfulness review answer different questions; retain both where needed.
+
+Use [Report](report.md) to communicate these results, with each displayed claim
+tied to its evidence and any pending checks kept visible.
